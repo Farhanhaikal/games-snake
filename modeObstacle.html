@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Snake Game</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <style>
+      /* style css body gamme */
+      body {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        margin: 0;
+        background: url(background.jpg);
+        background-size: auto;
+      }
+      /* style css game menu */
+      #gameCanvas {
+        border: 2px solid #343a40;
+        background-color: #ffffff;
+      }
+      /* style css untuk info score dan best score */
+      .game-info {
+        text-align: center;
+        margin-top: 0;
+        margin-bottom: 20px;
+      }
+      /* style css untuk menu game over */
+      .game-over {
+        display: none;
+        text-align: center;
+        background-color: rgba(0, 0, 0, 0.8);
+        color: #fff;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        padding: 20px;
+        border-radius: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- kontainer utama game -->
+    <div id="gameContainer" style="position: relative">
+      <!-- info score -->
+      <div class="game-info">
+        <h5>
+          Score: <span id="score">0</span> | Best Score:
+          <span id="bestScore">0</span>
+        </h5>
+      </div>
+      <!-- kanvas tempat game dimainkan -->
+      <canvas id="gameCanvas" width="500" height="500"></canvas>
+      <!-- menu game over -->
+      <div class="game-over" id="gameOverMenu">
+        <h2>Game Over</h2>
+        <p>Score: <span id="finalScore">0</span></p>
+        <p><strong>Tekan "R" untuk mengulang "M" untuk ke menu.</strong></p>
+      </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+      $(document).ready(function () {
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        const boxSize = 20;
+        const canvasSize = 500;
+        let snake = [{ x: 200, y: 200 }];
+        let direction = "RIGHT";
+        let fruit = { x: getRandomCoordinate(), y: getRandomCoordinate() };
+        let score = 0;
+        let gameInterval = null;
+        let bestScore = parseInt(localStorage.getItem("bestScore")) || 0;
+
+        const backgroundMusic = new Audio("background.mp3");
+        const eatSound = new Audio("eat.mp3");
+        const gameOverSound = new Audio("gameover.mp3");
+
+        backgroundMusic.loop = true;
+
+        // Rintangan acak
+        const obstacles = generateObstacles(10); // Jumlah rintangan diatur di sini
+
+        $(document).keydown(function (event) {
+          const key = event.keyCode;
+          if (key === 37 && direction !== "RIGHT") direction = "LEFT";
+          else if (key === 38 && direction !== "DOWN") direction = "UP";
+          else if (key === 39 && direction !== "LEFT") direction = "RIGHT";
+          else if (key === 40 && direction !== "UP") direction = "DOWN";
+          else if (key === 82) {
+            if ($("#gameOverMenu").is(":visible")) {
+              $("#gameOverMenu").hide();
+              startGame();
+            }
+          } else if (key === 77) {
+            window.location.href = "index.html";
+          }
+        });
+
+        function startGame() {
+          resetGame();
+          backgroundMusic.play();
+          gameInterval = setInterval(gameLoop, 100);
+        }
+
+        function stopGame() {
+          if (gameInterval) {
+            clearInterval(gameInterval);
+            gameInterval = null;
+          }
+          backgroundMusic.pause();
+          backgroundMusic.currentTime = 0;
+        }
+
+        function getRandomCoordinate() {
+          return Math.floor(Math.random() * (canvasSize / boxSize)) * boxSize;
+        }
+
+        function generateObstacles(count) {
+          const newObstacles = [];
+          for (let i = 0; i < count; i++) {
+            let obstacle;
+            do {
+              obstacle = { x: getRandomCoordinate(), y: getRandomCoordinate() };
+            } while (
+              snake.some(
+                (segment) =>
+                  segment.x === obstacle.x && segment.y === obstacle.y
+              ) ||
+              newObstacles.some(
+                (o) => o.x === obstacle.x && o.y === obstacle.y
+              ) ||
+              (fruit.x === obstacle.x && fruit.y === obstacle.y)
+            );
+            newObstacles.push(obstacle);
+          }
+          return newObstacles;
+        }
+
+        function drawGrid() {
+          for (let x = 0; x < canvasSize; x += boxSize) {
+            for (let y = 0; y < canvasSize; y += boxSize) {
+              ctx.fillStyle = "#F8E1B7";
+              ctx.fillRect(x, y, boxSize, boxSize);
+              ctx.strokeStyle = "grey";
+              ctx.strokeRect(x, y, boxSize, boxSize);
+            }
+          }
+        }
+
+        function drawSnake() {
+          snake.forEach((segment) => {
+            ctx.fillStyle = "#198754";
+            ctx.fillRect(segment.x, segment.y, boxSize, boxSize);
+            ctx.strokeStyle = "#000";
+            ctx.strokeRect(segment.x, segment.y, boxSize, boxSize);
+          });
+        }
+
+        function drawFruit() {
+          ctx.fillStyle = "#dc3545";
+          ctx.fillRect(fruit.x, fruit.y, boxSize, boxSize);
+        }
+
+        function drawObstacles() {
+          obstacles.forEach((obstacle) => {
+            ctx.fillStyle = "#6c757d";
+            ctx.fillRect(obstacle.x, obstacle.y, boxSize, boxSize);
+            ctx.strokeStyle = "#000";
+            ctx.strokeRect(obstacle.x, obstacle.y, boxSize, boxSize);
+          });
+        }
+
+        function moveSnake() {
+          const head = { x: snake[0].x, y: snake[0].y };
+          if (direction === "LEFT") head.x -= boxSize;
+          else if (direction === "UP") head.y -= boxSize;
+          else if (direction === "RIGHT") head.x += boxSize;
+          else if (direction === "DOWN") head.y += boxSize;
+
+          snake.unshift(head);
+          if (head.x === fruit.x && head.y === fruit.y) {
+            score++;
+            eatSound.play();
+            $("#score").text(score);
+            fruit = { x: getRandomCoordinate(), y: getRandomCoordinate() };
+          } else {
+            snake.pop();
+          }
+        }
+
+        function checkCollision() {
+          const head = snake[0];
+          if (
+            head.x < 0 ||
+            head.x >= canvasSize ||
+            head.y < 0 ||
+            head.y >= canvasSize ||
+            snake
+              .slice(1)
+              .some(
+                (segment) => segment.x === head.x && segment.y === head.y
+              ) ||
+            obstacles.some(
+              (obstacle) => obstacle.x === head.x && obstacle.y === head.y
+            )
+          ) {
+            return true;
+          }
+          return false;
+        }
+
+        function gameLoop() {
+          if (checkCollision()) {
+            stopGame();
+            gameOverSound.play();
+            endGame();
+            return;
+          }
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          drawGrid();
+          drawFruit();
+          drawObstacles();
+          moveSnake();
+          drawSnake();
+        }
+
+        function endGame() {
+          if (score > bestScore) {
+            bestScore = score;
+            localStorage.setItem("bestScore", bestScore);
+          }
+          $("#finalScore").text(score);
+          $("#bestScore").text(bestScore);
+          $("#gameOverMenu").show();
+        }
+
+        function resetGame() {
+          snake = [{ x: 200, y: 200 }];
+          direction = "RIGHT";
+          fruit = { x: getRandomCoordinate(), y: getRandomCoordinate() };
+          score = 0;
+          $("#score").text(score);
+          $("#bestScore").text(bestScore);
+          obstacles.length = 0;
+          obstacles.push(...generateObstacles(10));
+        }
+
+        resetGame();
+        startGame();
+      });
+    </script>
+  </body>
+</html>
